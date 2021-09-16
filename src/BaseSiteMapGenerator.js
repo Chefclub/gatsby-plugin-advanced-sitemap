@@ -84,7 +84,7 @@ export default class BaseSiteMapGenerator {
     }
 
     createUrlNodeFromDatum(url, datum) {
-        let node, imgNode;
+        let node, imgNode, videoNode;
 
         node = {
             url: [
@@ -97,6 +97,12 @@ export default class BaseSiteMapGenerator {
 
         if (imgNode) {
             node.url.push(imgNode);
+        }
+
+        videoNode = this.createVideoNodeFromDatum(datum);
+    
+        if (videoNode) {
+            node.url.push(videoNode);
         }
 
         return node;
@@ -119,6 +125,18 @@ export default class BaseSiteMapGenerator {
 
         // Return the node to be added to the url xml node
         return { 'image:image': imageEl } //eslint-disable-line
+    }
+
+    createVideoNodeFromDatum(datum) {
+        // Check for video data
+        const video = datum.video;
+    
+        if (!video) {
+            return;
+        }
+    
+        // Return the node to be added to the url xml node
+        return { 'video:video': video } //eslint-disable-line
     }
 
     validateImageUrl(imageUrl) {
