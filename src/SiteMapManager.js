@@ -3,12 +3,16 @@ import SiteMapGenerator from './SiteMapGenerator';
 import _ from 'lodash';
 
 export default class SiteMapManager {
-    constructor(options) {
+    constructor(options, language) {
         let sitemapTypes = [];
 
-        options = options || {};
+        options = {
+            ...options,
+            mapping: filterMappingByLanguage(options.mapping, language),
+        } || {};
 
         this.options = options;
+        this.language = language
 
         for (let type in options.mapping) {
             const sitemapType = options.mapping[type].sitemap || `pages`;
@@ -42,18 +46,38 @@ export default class SiteMapManager {
         return new SiteMapGenerator(options, type);
     }
 
-    getIndexXml(options) {
-        return this.index.getXml(options);
+    getIndexXml(options, siteUrl) {
+        return this.index.getXml(options, siteUrl);
     }
 
     getSiteMapXml(type, options) {
-        return this[type].getXml(options);
+        if (this[type]) {
+            return this[type].getXml(options);
+        }
     }
 
     // This is the equivalent of adding the URLs on bootstrap by listening to the events
     // like we do in Ghost core
     addUrls(type, {url, node}) {
-        return this[type].addUrl(url, node);
+        if (this[type]) {
+            return this[type].addUrl(url, node);
+        }
+    }
+
+    addChild(manager){
+        if (!this.index.types.children) {
+            this.index.types.children = []
+        }
+        this.index.types.children.push(manager)
     }
 }
 
+const filterMappingByLanguage = (mapping, language) => {
+    let newMapping = {}
+    Object.keys(mapping).forEach((mappingKey) => {
+        if (mapping[mappingKey].language === language) {
+            newMapping[mappingKey] = mapping[mappingKey]
+        }
+    })
+    return newMapping
+}

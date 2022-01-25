@@ -20,6 +20,13 @@ export default class SiteMapIndexGenerator {
 
     getXml(options) {
         const urlElements = this.generateSiteMapUrlElements(options);
+
+        if (this.types.children) {
+            this.types.children.forEach((child) => {
+                urlElements.push({ sitemap: [{ loc: `${siteUrl}/sitemap-${child.language}.xml` }, { lastmod: new Date() }] })
+            })
+        }
+
         const data = {
             // Concat the elements to the _attr declaration
             sitemapindex: [XMLNS_DECLS].concat(urlElements)

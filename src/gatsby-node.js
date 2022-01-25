@@ -135,7 +135,8 @@ const serializeSources = ({mapping, additionalSitemaps = []}) => {
         // and the belonging sources accordingly
         return {
             name: source.name || source.sitemap,
-            sitemap: source.sitemap || `pages`
+            sitemap: source.sitemap || `pages`,
+            language: source.language
         };
     });
 
@@ -245,7 +246,8 @@ const serialize = ({...sources} = {}, {site, allSitePage}, {mapping, addUncaught
 
                     sourceObject[mapping[type].sitemap].push({
                         url: url.resolve(siteURL, node.path),
-                        node: node
+                        node: node,
+                        language: mapping[type].language
                     });
                 });
             }
@@ -301,14 +303,20 @@ exports.onPostBuild = async ({graphql, pathPrefix}, pluginOptions) => {
         queryRecords = await runQuery(graphql, options);
     }
 
-    // Instanciate the Ghost Sitemaps Manager
-    const manager = new Manager(options);
+    // Instanciate the Ghost Sitemaps Managers, one per language (sitemap-xx.xml) and one general (sitemap.xml) which reference the others sitemap-xx.xml and the types without language
+    const managers = {
+        base: new Manager(options),
+    }
+    options.languages.forEach((languageCode) => {
+        managers[languageCode] = new Manager(options, languageCode)
+        managers.base.addChild(managers[languageCode])
+    })
 
     await serialize(queryRecords, defaultQueryRecords, options).forEach((source) => {
         for (let type in source) {
             source[type].forEach((node) => {
                 // "feed" the sitemaps manager with our serialized records
-                manager.addUrls(type, node);
+                managers[node.language ?? `base`].addUrls(type, node);
             });
         }
     });
@@ -332,28 +340,41 @@ exports.onPostBuild = async ({graphql, pathPrefix}, pluginOptions) => {
             // for each passed name we want to receive the related source type
             resourcesSiteMapsArray.push({
                 type: type.name,
-                xml: manager.getSiteMapXml(type.sitemap, options)
+                xml: managers[type.language].getSiteMapXml(type.sitemap, options)
             });
         }
     });
 
-    const indexSiteMap = manager.getIndexXml(options);
+    const indexesSiteMap = {}
+     Object.keys(managers).forEach((key) => {
+         indexesSiteMap[key] = managers[key].getIndexXml(options, siteURL)
+     })
 
     // Save the generated xml files in the public folder
-    try {
-        await utils.outputFile(indexSitemapFile, indexSiteMap);
-    } catch (err) {
-        console.error(err);
-    }
+    await Promise.all(Object.keys(indexesSiteMap).map(async (key) => {
+        try {
+            let indexSitemapFile = path.join(PUBLICPATH, pathPrefix, options.output)
+            if (key !== `base`){
+                indexSitemapFile = indexSitemapFile.replace(/.xml$/g, `-${key}.xml`)
+            }
+            await utils.outputFile(indexSitemapFile, indexesSiteMap[key])
+        } catch (err) {
+            console.error(err)
+        }
+    }))
 
     for (let sitemap of resourcesSiteMapsArray) {
-        const filePath = resourcesSitemapFile.replace(/:resource/, sitemap.type);
+        if (!sitemap.xml) {
+            console.log(`No xml found for sitemap `, sitemap.type)
+        } else {
+            const filePath = resourcesSitemapFile.replace(/:resource/, sitemap.type)
 
-        // Save the generated xml files in the public folder
-        try {
-            await utils.outputFile(filePath, sitemap.xml);
-        } catch (err) {
-            console.error(err);
+            // Save the generated xml files in the public folder
+            try {
+                await utils.outputFile(filePath, sitemap.xml)
+            } catch (err) {
+                console.error(err)
+            }
         }
     }
 
