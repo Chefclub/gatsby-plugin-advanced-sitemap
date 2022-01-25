@@ -18,7 +18,7 @@ export default class SiteMapIndexGenerator {
         this.types = options.types;
     }
 
-    getXml(options) {
+    getXml(options, siteUrl) {
         const urlElements = this.generateSiteMapUrlElements(options);
 
         if (this.types.children) {
@@ -37,6 +37,7 @@ export default class SiteMapIndexGenerator {
     }
 
     generateSiteMapUrlElements({sources, siteUrl, pathPrefix, resourcesOutput}) {
+        sources = sources.filter(source => Object.keys(this.types).includes(source.sitemap))
         return _.map(sources, (source) => {
             const filePath = resourcesOutput.replace(/:resource/, source.name).replace(/^\//, ``);
             const siteMapUrl = source.url ? source.url : url.resolve(siteUrl, path.join(pathPrefix, filePath));
